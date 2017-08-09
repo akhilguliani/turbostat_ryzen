@@ -77,7 +77,6 @@ unsigned int show_pkg_only;
 unsigned int show_core_only;
 char *output_buffer, *outp;
 unsigned int do_rapl;
-unsigned int do_amd;
 unsigned int do_dts;
 unsigned int do_ptm;
 unsigned long long  gfx_cur_rc6_ms;
@@ -173,7 +172,6 @@ struct core_data {
 	unsigned long long c7;
 	unsigned long long mc6_us;	/* duplicate as per-core for now, even though per module */
 	unsigned int core_temp_c;
-  unsigned int core_energy; /*MSR_CORE_ENERGY_STATUS AMD Fam 17h */
 	unsigned int core_id;
 	unsigned long long counter[MAX_ADDED_COUNTERS];
 } *core_even, *core_odd;
@@ -719,10 +717,8 @@ int dump_counters(struct thread_data *t, struct core_data *c,
 		outp += sprintf(outp, "c6: %016llX\n", c->c6);
 		outp += sprintf(outp, "c7: %016llX\n", c->c7);
 		outp += sprintf(outp, "DTS: %dC\n", c->core_temp_c);
-    //TODO: Add per core power number
-    outp += sprintf(outp, "Joules COR: %0X\n", c->core_energy);
 
-    for (i = 0, mp = sys.cp; mp; i++, mp = mp->next) {
+		for (i = 0, mp = sys.cp; mp; i++, mp = mp->next) {
 			outp += sprintf(outp, "cADDED [%d] msr0x%x: %08llX\n",
 				i, mp->msr_num, c->counter[i]);
 		}
@@ -903,7 +899,6 @@ int format_counters(struct thread_data *t, struct core_data *c,
 
 	if (DO_BIC(BIC_CoreTmp))
 		outp += sprintf(outp, "%s%d", (printed++ ? delim : ""), c->core_temp_c);
-// TODO: Fix Core Avg Power print by printing everything
 
 	for (i = 0, mp = sys.cp; mp; i++, mp = mp->next) {
 		if (mp->format == FORMAT_RAW) {
@@ -922,11 +917,9 @@ int format_counters(struct thread_data *t, struct core_data *c,
 	}
 
 	/* print per-package data only for 1st core in package */
-	// UNCOMMENT for normal operation
-  // Hack to test per cpu core watt print
-  /* if (!(t->flags & CPU_IS_FIRST_CORE_IN_PACKAGE))
+	if (!(t->flags & CPU_IS_FIRST_CORE_IN_PACKAGE))
 		goto done;
-  */
+
 	/* PkgTmp */
 	if (DO_BIC(BIC_PkgTmp))
 		outp += sprintf(outp, "%s%d", (printed++ ? delim : ""), p->pkg_temp_c);
@@ -978,23 +971,19 @@ int format_counters(struct thread_data *t, struct core_data *c,
 		fmt8 = "%s%.2f";
 	else
 		fmt8 = "%6.0f**";
-// TODO: Fixes for per core energy to be displayed here
+
 	if (DO_BIC(BIC_PkgWatt))
 		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_pkg * rapl_energy_units / interval_float);
-/*	if (DO_BIC(BIC_CorWatt))
-		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_cores * rapl_energy_units / interval_float);*/
 	if (DO_BIC(BIC_CorWatt))
-		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), c->core_energy * rapl_energy_units / interval_float);
+		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_cores * rapl_energy_units / interval_float);
 	if (DO_BIC(BIC_GFXWatt))
 		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_gfx * rapl_energy_units / interval_float);
 	if (DO_BIC(BIC_RAMWatt))
 		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_dram * rapl_dram_energy_units / interval_float);
 	if (DO_BIC(BIC_Pkg_J))
 		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_pkg * rapl_energy_units);
-/*	if (DO_BIC(BIC_Cor_J))
-		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_cores * rapl_energy_units);*/
 	if (DO_BIC(BIC_Cor_J))
-		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), c->core_energy * rapl_energy_units);
+		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_cores * rapl_energy_units);
 	if (DO_BIC(BIC_GFX_J))
 		outp += sprintf(outp, fmt8, (printed++ ? delim : ""), p->energy_gfx * rapl_energy_units);
 	if (DO_BIC(BIC_RAM_J))
@@ -1136,9 +1125,8 @@ delta_core(struct core_data *new, struct core_data *old)
 	old->c7 = new->c7 - old->c7;
 	old->core_temp_c = new->core_temp_c;
 	old->mc6_us = new->mc6_us - old->mc6_us;
-  DELTA_WRAP32(new->core_energy, old->core_energy);
 
-  for (i = 0, mp = sys.cp; mp; i++, mp = mp->next) {
+	for (i = 0, mp = sys.cp; mp; i++, mp = mp->next) {
 		if (mp->format == FORMAT_RAW)
 			old->counter[i] = new->counter[i];
 		else
@@ -1260,7 +1248,6 @@ void clear_counters(struct thread_data *t, struct core_data *c, struct pkg_data 
 	c->c7 = 0;
 	c->mc6_us = 0;
 	c->core_temp_c = 0;
-  c->core_energy = 0;
 
 	p->pkg_wtd_core_c0 = 0;
 	p->pkg_any_core_c0 = 0;
@@ -1325,9 +1312,8 @@ int sum_counters(struct thread_data *t, struct core_data *c,
 	average.cores.c6 += c->c6;
 	average.cores.c7 += c->c7;
 	average.cores.mc6_us += c->mc6_us;
-  average.cores.core_energy += c->core_energy;
 
-  average.cores.core_temp_c = MAX(average.cores.core_temp_c, c->core_temp_c);
+	average.cores.core_temp_c = MAX(average.cores.core_temp_c, c->core_temp_c);
 
 	for (i = 0, mp = sys.cp; mp; i++, mp = mp->next) {
 		if (mp->format == FORMAT_RAW)
@@ -1405,9 +1391,8 @@ void compute_average(struct thread_data *t, struct core_data *c,
 	average.cores.c6 /= topo.num_cores;
 	average.cores.c7 /= topo.num_cores;
 	average.cores.mc6_us /= topo.num_cores;
-  // average.cores.core_energy /= topo.num_cores;
 
-  if (DO_BIC(BIC_Totl_c0))
+	if (DO_BIC(BIC_Totl_c0))
 		average.packages.pkg_wtd_core_c0 /= topo.num_packages;
 	if (DO_BIC(BIC_Any_c0))
 		average.packages.pkg_any_core_c0 /= topo.num_packages;
@@ -1647,13 +1632,6 @@ retry:
 		if (get_msr(cpu, MSR_IA32_THERM_STATUS, &msr))
 			return -9;
 		c->core_temp_c = tcc_activation_temp - ((msr >> 16) & 0x7F);
-	}
-
-  /* TODO: Add collection for individual core energy MSRs */
-  if (do_rapl & RAPL_CORES_ENERGY_STATUS) {
-		if (get_msr(cpu, MSR_PP0_ENERGY_STATUS, &msr))
-			return -14;
-		c->core_energy = msr & 0xFFFFFFFF;
 	}
 
 	for (i = 0, mp = sys.cp; mp; i++, mp = mp->next) {
@@ -3389,39 +3367,7 @@ void rapl_probe(unsigned int family, unsigned int model)
 	double tdp;
 
 	if (!genuine_intel)
-		// Added for genuine AMD fam 17h
-		do_amd = 1;
-		do_rapl = RAPL_PKG | RAPL_CORES;
-                if (rapl_joules) {
-                        BIC_PRESENT(BIC_Pkg_J);
-                        BIC_PRESENT(BIC_Cor_J);
-                } else {
-                        BIC_PRESENT(BIC_PkgWatt);
-                        BIC_PRESENT(BIC_CorWatt);
-                }
-
-		/* units on package 0, verify later other packages match */
-		// TODO: this is failing need to fix this msr read
-		if (get_msr(base_cpu, MSR_RAPL_POWER_UNIT, &msr))
-			return;
-
-		rapl_power_units = 1.0 / (1 << (msr & 0xF));
-		rapl_energy_units = 1.0 / (1 << (msr >> 8 & 0x1F));
-
-		time_unit = msr >> 16 & 0xF;
-		if (time_unit == 0)
-			time_unit = 0xA;
-
-		rapl_time_units = 1.0 / (1 << (time_unit));
-
-		tdp = 95.0;
-
-		rapl_joule_counter_range = 0xFFFFFFFF * rapl_energy_units / tdp;
-
-    if (!quiet)
-		  fprintf(outf, "RAPL: %016llu msr, %.0f sec. Joule Counter Range, at %.0f Watts\n", msr, rapl_joule_counter_range, tdp);
 		return;
-
 
 	if (family != 6)
 		return;
@@ -3678,12 +3624,6 @@ int print_rapl(struct thread_data *t, struct core_data *c, struct pkg_data *p)
 	fprintf(outf, "cpu%d: MSR_RAPL_POWER_UNIT: 0x%08llx (%f Watts, %f Joules, %f sec.)\n", cpu, msr,
 		rapl_power_units, rapl_energy_units, rapl_time_units);
 
-	if (do_amd) {
-		//AMD addon
-		// No need to do following steps as MSRs are not clearly defined
-		// hence skip the rest and return
-		return 0;
-	}
 	if (do_rapl & RAPL_PKG_POWER_INFO) {
 
 		if (get_msr(cpu, MSR_PKG_POWER_INFO, &msr))
