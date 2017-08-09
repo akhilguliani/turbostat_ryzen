@@ -10,7 +10,7 @@ endif
 turbostat : turbostat.c
 CFLAGS +=	-Wall -g
 CFLAGS +=	-DMSRHEADER='"msr-index.h"'
-CFLAGS +=	-DINTEL_FAMILY_HEADER='"../../linux-next/arch/x86/include/asm/intel-family.h"'
+CFLAGS +=	-DINTEL_FAMILY_HEADER='"intel-family.h"'
 
 %: %.c
 	@mkdir -p $(BUILD_OUTPUT)
