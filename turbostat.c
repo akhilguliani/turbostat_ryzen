@@ -3369,7 +3369,7 @@ void rapl_probe(unsigned int family, unsigned int model)
 
 	if (!genuine_intel)
 		// Added for genuine AMD fam 17h
-		do_amd = 1;	
+		do_amd = 1;
 		do_rapl = RAPL_PKG | RAPL_CORES;
                 if (rapl_joules) {
                         BIC_PRESENT(BIC_Pkg_J);
@@ -3380,13 +3380,13 @@ void rapl_probe(unsigned int family, unsigned int model)
                 }
 
 		/* units on package 0, verify later other packages match */
+		// TODO: this is failing need to fix this msr read
 		if (get_msr(base_cpu, MSR_RAPL_POWER_UNIT, &msr))
-			fprintf(outf,"FAILED at get msr for AMD\n");
 			return;
 
 		rapl_power_units = 1.0 / (1 << (msr & 0xF));
 		rapl_energy_units = 1.0 / (1 << (msr >> 8 & 0x1F));
-		
+
 		time_unit = msr >> 16 & 0xF;
 		if (time_unit == 0)
 			time_unit = 0xA;
@@ -3396,8 +3396,9 @@ void rapl_probe(unsigned int family, unsigned int model)
 		tdp = 95.0;
 
 		rapl_joule_counter_range = 0xFFFFFFFF * rapl_energy_units / tdp;
-		if (!quiet)
-			fprintf(outf, "RAPL: %.0f sec. Joule Counter Range, at %.0f Watts\n", rapl_joule_counter_range, tdp);
+
+    if (!quiet)
+		  fprintf(outf, "RAPL: %016llu msr, %.0f sec. Joule Counter Range, at %.0f Watts\n", msr, rapl_joule_counter_range, tdp);
 		return;
 
 
@@ -3655,10 +3656,10 @@ int print_rapl(struct thread_data *t, struct core_data *c, struct pkg_data *p)
 
 	fprintf(outf, "cpu%d: MSR_RAPL_POWER_UNIT: 0x%08llx (%f Watts, %f Joules, %f sec.)\n", cpu, msr,
 		rapl_power_units, rapl_energy_units, rapl_time_units);
-	
+
 	if (do_amd) {
 		//AMD addon
-		// No need to do following steps as MSRs are not clearly defined 
+		// No need to do following steps as MSRs are not clearly defined
 		// hence skip the rest and return
 		return 0;
 	}
