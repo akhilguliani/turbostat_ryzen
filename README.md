@@ -27,7 +27,7 @@ $ turbostat [Options] application_cmd
 ```
 Please refer [manpage](https://manpages.debian.org/testing/linux-cpupower/turbostat.8.en.html) for more information.
 
-I made these modifiaction to perform application profiling experiments for my work [Per-application power delivery published in Eurosys 2019](http://pages.cs.wisc.edu/~swift/papers/eurosys19-power.pdf).
+I made these modifiction to perform application profiling experiments for my work [Per-application power delivery published in Eurosys 2019](http://pages.cs.wisc.edu/~swift/papers/eurosys19-power.pdf).
 If you found this utility useful for you own project, please help support this work by citing it.
 ```
 inproceedings{10.1145/3302424.3303981,
